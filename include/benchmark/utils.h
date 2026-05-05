@@ -28,7 +28,57 @@ namespace internal {
 BENCHMARK_EXPORT void UseCharPointer(char const volatile*);
 }
 
-#if (!defined(__GNUC__) && !defined(__clang__)) || defined(__pnacl__) || \
+#if defined(__LCC__) || defined(__lcc__) || defined(__e2k__) || defined(__E2K__)
+
+template <class Tp>
+BENCHMARK_DEPRECATED_MSG(
+    "The const-ref version of this method can permit "
+    "undesired compiler optimizations in benchmarks")
+inline BENCHMARK_ALWAYS_INLINE
+    typename std::enable_if<std::is_scalar<Tp>::value>::type
+    DoNotOptimize(Tp const& value) {
+  asm volatile("" : : "r"(value) : "memory");
+}
+
+template <class Tp>
+BENCHMARK_DEPRECATED_MSG(
+    "The const-ref version of this method can permit "
+    "undesired compiler optimizations in benchmarks")
+inline BENCHMARK_ALWAYS_INLINE
+    typename std::enable_if<!std::is_scalar<Tp>::value>::type
+    DoNotOptimize(Tp const& value) {
+  asm volatile("" : : "r"(&value) : "memory");
+}
+
+template <class Tp>
+inline BENCHMARK_ALWAYS_INLINE
+    typename std::enable_if<std::is_scalar<Tp>::value>::type
+    DoNotOptimize(Tp& value) {
+  asm volatile("" : "+r"(value) : : "memory");
+}
+
+template <class Tp>
+inline BENCHMARK_ALWAYS_INLINE
+    typename std::enable_if<!std::is_scalar<Tp>::value>::type
+    DoNotOptimize(Tp& value) {
+  asm volatile("" : : "r"(&value) : "memory");
+}
+
+template <class Tp>
+inline BENCHMARK_ALWAYS_INLINE
+    typename std::enable_if<std::is_scalar<Tp>::value>::type
+    DoNotOptimize(Tp&& value) {
+  asm volatile("" : "+r"(value) : : "memory");
+}
+
+template <class Tp>
+inline BENCHMARK_ALWAYS_INLINE
+    typename std::enable_if<!std::is_scalar<Tp>::value>::type
+    DoNotOptimize(Tp&& value) {
+  asm volatile("" : : "r"(&value) : "memory");
+}
+
+#elif (!defined(__GNUC__) && !defined(__clang__)) || defined(__pnacl__) || \
     defined(__EMSCRIPTEN__)
 #define BENCHMARK_HAS_NO_INLINE_ASSEMBLY
 #endif
@@ -92,7 +142,7 @@ inline BENCHMARK_ALWAYS_INLINE
     typename std::enable_if<std::is_trivially_copyable<Tp>::value &&
                             (sizeof(Tp) <= sizeof(Tp*))>::type
     DoNotOptimize(Tp& value) {
-  asm volatile("" : "+rm"(value) : : "memory");
+  asm volatile("" : "+m,r"(value) : : "memory");
 }
 
 template <class Tp>
