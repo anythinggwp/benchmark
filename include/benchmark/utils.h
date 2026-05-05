@@ -28,6 +28,17 @@ namespace internal {
 BENCHMARK_EXPORT void UseCharPointer(char const volatile*);
 }
 
+#if (!defined(__GNUC__) && !defined(__clang__)) || defined(__pnacl__) || \
+    defined(__EMSCRIPTEN__)
+#define BENCHMARK_HAS_NO_INLINE_ASSEMBLY
+#endif
+
+inline BENCHMARK_ALWAYS_INLINE void ClobberMemory() {
+  std::atomic_signal_fence(std::memory_order_acq_rel);
+}
+
+#ifndef BENCHMARK_HAS_NO_INLINE_ASSEMBLY
+
 #if defined(__LCC__) || defined(__lcc__) || defined(__e2k__) || defined(__E2K__)
 
 template <class Tp>
@@ -78,17 +89,7 @@ inline BENCHMARK_ALWAYS_INLINE
   asm volatile("" : : "r"(&value) : "memory");
 }
 
-#elif (!defined(__GNUC__) && !defined(__clang__)) || defined(__pnacl__) || \
-    defined(__EMSCRIPTEN__)
-#define BENCHMARK_HAS_NO_INLINE_ASSEMBLY
-#endif
-
-inline BENCHMARK_ALWAYS_INLINE void ClobberMemory() {
-  std::atomic_signal_fence(std::memory_order_acq_rel);
-}
-
-#ifndef BENCHMARK_HAS_NO_INLINE_ASSEMBLY
-#if !defined(__GNUC__) || defined(__llvm__) || defined(__INTEL_COMPILER)
+#elif !defined(__GNUC__) || defined(__llvm__) || defined(__INTEL_COMPILER)
 template <class Tp>
 BENCHMARK_DEPRECATED_MSG(
     "The const-ref version of this method can permit "
