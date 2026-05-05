@@ -92,7 +92,7 @@ inline BENCHMARK_ALWAYS_INLINE
     typename std::enable_if<std::is_trivially_copyable<Tp>::value &&
                             (sizeof(Tp) <= sizeof(Tp*))>::type
     DoNotOptimize(Tp& value) {
-  asm volatile("" : "+m,r"(value) : : "memory");
+  asm volatile("" : "+rm"(value) : : "memory");
 }
 
 template <class Tp>
