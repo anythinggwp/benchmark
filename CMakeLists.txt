@@ -3,6 +3,13 @@ cmake_minimum_required (VERSION 3.13...3.22)
 
 project (benchmark VERSION 1.9.5 LANGUAGES CXX)
 
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "LCC" OR CMAKE_CXX_COMPILER MATCHES "lcc")
+  set(BENCHMARK_IS_MCST_LCC ON)
+else()
+  set(BENCHMARK_IS_MCST_LCC OFF)
+endif()
+
 option(BENCHMARK_ENABLE_TESTING "Enable testing of the benchmark library." ON)
 option(BENCHMARK_ENABLE_EXCEPTIONS "Enable the use of exceptions in the benchmark library." ON)
 option(BENCHMARK_ENABLE_LTO "Enable link time optimisation of the benchmark library." OFF)
@@ -15,6 +22,11 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "PGI")
   set(BENCHMARK_ENABLE_WERROR OFF)
 endif()
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "NVHPC")
+  set(BENCHMARK_ENABLE_WERROR OFF)
+endif()
+if(BENCHMARK_IS_MCST_LCC)
+  # Do not use -Werror with MCST LCC. Some diagnostics from system headers are
+  # too strict for third-party projects and can break tests using gtest/std::variant.
   set(BENCHMARK_ENABLE_WERROR OFF)
 endif()
 if(BENCHMARK_FORCE_WERROR)
@@ -201,17 +213,31 @@ else()
   add_cxx_compiler_flag(-Wshadow)
   add_cxx_compiler_flag(-Wfloat-equal)
   add_cxx_compiler_flag(-Wold-style-cast)
-  add_cxx_compiler_flag(-Wconversion)
+
+  # MCST LCC reports sign-changing conversions in its own C++ standard library
+  # headers, for example in <variant>. Do not enable -Wconversion for this compiler.
+  if (NOT BENCHMARK_IS_MCST_LCC)
+    add_cxx_compiler_flag(-Wconversion)
+  endif()
+
   add_cxx_compiler_flag(-Wformat=2)
-  if(BENCHMARK_ENABLE_WERROR)
+
+  # Do not use -Werror / -pedantic-errors with MCST LCC.
+  # They can turn harmless diagnostics from system headers into build failures.
+  if(BENCHMARK_ENABLE_WERROR AND NOT BENCHMARK_IS_MCST_LCC)
       add_cxx_compiler_flag(-Werror)
       add_cxx_compiler_flag(-pedantic-errors)
   endif()
+
   if (NOT BENCHMARK_ENABLE_TESTING)
     # Disable warning when compiling tests as gtest does not use 'override'.
     add_cxx_compiler_flag(-Wsuggest-override)
   endif()
-  add_cxx_compiler_flag(-pedantic)
+
+  if (NOT BENCHMARK_IS_MCST_LCC)
+    add_cxx_compiler_flag(-pedantic)
+  endif()
+
   add_cxx_compiler_flag(-Wshorten-64-to-32)
   add_cxx_compiler_flag(-fstrict-aliasing)
   # Disable warnings regarding deprecated parts of the library while building
@@ -227,8 +253,8 @@ else()
     # overridden (because of deprecated overload)
     add_cxx_compiler_flag(-wd654)
   endif()
-  # Disable deprecation warnings for release builds (when -Werror is enabled).
-  if(BENCHMARK_ENABLE_WERROR)
+  # Disable deprecation warnings for release builds when -Werror is enabled.
+  if(BENCHMARK_ENABLE_WERROR AND NOT BENCHMARK_IS_MCST_LCC)
       add_cxx_compiler_flag(-Wno-deprecated)
   endif()
   if (NOT BENCHMARK_ENABLE_EXCEPTIONS)
@@ -366,3 +392,4 @@ if (BENCHMARK_ENABLE_TESTING)
   endif()
   add_subdirectory(test)
 endif()
+
